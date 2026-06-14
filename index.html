@@ -2,138 +2,129 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>VaniaCoin - Banco da Feira</title>
+    <title>Banco VaniaCoin - Área do Aluno</title>
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; display: flex; justify-content: center; padding-top: 20px; background-color: #f4f4f9; }
-        .box { border: 2px solid #28a745; padding: 20px; border-radius: 12px; width: 350px; text-align: center; background: white; margin: 10px; }
-        .brand { color: #28a745; font-weight: bold; font-size: 28px; margin-bottom: 10px; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; background-color: #f4f4f9; text-align: center; }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         input, select { display: block; width: 90%; margin: 10px auto; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
         button { background-color: #28a745; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; width: 95%; margin-top: 10px; }
-        #telaPrincipal { display: none; }
-        .extrato-item { border-bottom: 1px solid #eee; padding: 8px; font-size: 0.9em; text-align: left; }
-        .enviado { color: #dc3545; }
-        .recebido { color: #28a745; }
-        footer { margin-top: 20px; font-size: 0.75em; color: #888; }
+        #areaAluno, #divPix { display: none; }
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #28a745; color: white; }
     </style>
 </head>
 <body>
 
-    <div id="telaLogin" class="box">
-        <div class="brand">VaniaCoin</div>
-        <h2>Login Aluno</h2>
-        <input type="text" id="conta" placeholder="Conta" maxlength="9">
-        <input type="text" id="digito" placeholder="Dígito" maxlength="1">
-        <input type="password" id="senha" placeholder="Senha">
-        <button id="btnEntrar">Entrar</button>
+    <div class="container" id="loginBox">
+        <h2>Banco VaniaCoin - Login</h2>
+        <input type="text" id="inputConta" placeholder="Conta">
+        <input type="text" id="inputDigito" placeholder="Dígito">
+        <input type="password" id="inputSenha" placeholder="Senha">
+        <button onclick="fazerLogin()">Entrar</button>
     </div>
 
-    <div id="telaPrincipal" class="box">
-        <div class="brand">VaniaCoin</div>
-        <h2 id="nomeUsuario"></h2>
-        <p>Saldo Atual:</p>
-        <h1 id="saldoUsuario">R$ 0,00</h1>
+    <div class="container" id="areaAluno">
+        <h2 id="tituloNome">Olá, Aluno</h2>
+        <h3>Saldo: <span id="saldoAtual" style="color: #28a745; font-weight: bold;">R$ 0.00</span></h3>
+        <button onclick="abrirPix()">Fazer Pix</button>
         
-        <hr>
-        
-        <h3>Realizar Pix</h3>
-        <select id="selectDestino"><option value="">Carregando usuários...</option></select>
-        <input type="number" id="valorTransferencia" placeholder="Valor (R$)">
-        <button id="btnTransferir">Confirmar Pix</button>
-        
-        <div style="margin-top: 20px; text-align: left;">
-            <h3>Seu Extrato:</h3>
-            <div id="listaExtrato"></div>
+        <div id="divPix" style="margin-top:20px; border:1px solid #ddd; padding:10px;">
+            <label>Enviar para:</label>
+            <select id="selectDestinatario"></select>
+            <input type="number" id="pixValor" placeholder="Valor (ex: 10.50)" step="0.01">
+            <button onclick="enviarPix()" style="background-color: #007bff;">Confirmar Pix</button>
         </div>
 
-        <button style="background-color: #6c757d;" onclick="location.reload()">Sair</button>
-        <footer>Sistema VaniaCoin | Desenvolvido por Vania Oliveira © 2026</footer>
+        <h4>Extrato</h4>
+        <div id="extrato">Carregando...</div>
+        <button style="background-color: #dc3545;" onclick="window.location.reload()">Sair</button>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, getDocs, collection, runTransaction, query, orderBy } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, getDocs, collection, query, where, or, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyAMUE6hQs4lfLXKvWmSKS1k5k6brLvUH18",
-            authDomain: "banco-eletiva.firebaseapp.com",
-            projectId: "banco-eletiva",
-            storageBucket: "banco-eletiva.firebasestorage.app",
-            messagingSenderId: "5630766462",
-            appId: "1:5630766462:web:275544449d2b58e154d72f",
-            measurementId: "G-J9FK5M1LY5"
+        const db = getFirestore(initializeApp({ apiKey: "AIzaSyAMUE6hQs4lfLXKvWmSKS1k5k6brLvUH18", authDomain: "banco-eletiva.firebaseapp.com", projectId: "banco-eletiva", storageBucket: "banco-eletiva.firebasestorage.app", messagingSenderId: "5630766462", appId: "1:5630766462:web:275544449d2b58e154d72f", measurementId: "G-J9FK5M1LY5" }));
+
+        let contaAtual = "";
+
+        window.fazerLogin = async () => {
+            const id = document.getElementById('inputConta').value + "-" + document.getElementById('inputDigito').value;
+            const senha = document.getElementById('inputSenha').value;
+            const docSnap = await getDoc(doc(db, "usuarios", id));
+
+            if (docSnap.exists() && docSnap.data().senha === senha) {
+                contaAtual = id;
+                document.getElementById('loginBox').style.display = 'none';
+                document.getElementById('areaAluno').style.display = 'block';
+                document.getElementById('tituloNome').innerText = "Olá, " + docSnap.data().nome;
+                atualizarTudo();
+            } else { alert("Dados incorretos!"); }
         };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        let idLogado = "";
-
-        async function carregarExtrato() {
-            const lista = document.getElementById('listaExtrato');
-            lista.innerHTML = 'Carregando...';
-            const q = query(collection(db, "transacoes"), orderBy("data", "desc"));
-            const querySnapshot = await getDocs(q);
-            lista.innerHTML = '';
-            querySnapshot.forEach((d) => {
-                const t = d.data();
-                if (t.origem === idLogado) {
-                    lista.innerHTML += `<div class="extrato-item enviado">📤 Para ${t.destino}: -R$ ${Number(t.valor).toFixed(2)}</div>`;
-                } else if (t.destino === idLogado) {
-                    lista.innerHTML += `<div class="extrato-item recebido">📥 De ${t.origem}: +R$ ${Number(t.valor).toFixed(2)}</div>`;
+        window.abrirPix = async () => {
+            document.getElementById('divPix').style.display = 'block';
+            const usersSnap = await getDocs(collection(db, "usuarios"));
+            const select = document.getElementById('selectDestinatario');
+            
+            select.innerHTML = '<option value="LOJA-VANIA">Loja da Escola</option>';
+            usersSnap.forEach((u) => {
+                if (u.id !== contaAtual) {
+                    select.innerHTML += `<option value="${u.id}">${u.data().nome}</option>`;
                 }
             });
-        }
+        };
 
-        document.getElementById('btnEntrar').addEventListener('click', async () => {
-            idLogado = document.getElementById('conta').value + "-" + document.getElementById('digito').value;
-            const senha = document.getElementById('senha').value;
-            const docSnap = await getDoc(doc(db, "usuarios", idLogado));
-            if (docSnap.exists() && docSnap.data().senha === senha) {
-                document.getElementById('telaLogin').style.display = 'none';
-                document.getElementById('telaPrincipal').style.display = 'block';
-                document.getElementById('nomeUsuario').innerText = "Olá, " + docSnap.data().nome;
-                document.getElementById('saldoUsuario').innerText = "R$ " + Number(docSnap.data().saldo).toFixed(2);
-                
-                const usersSnap = await getDocs(collection(db, "usuarios"));
-                const select = document.getElementById('selectDestino');
-                select.innerHTML = '<option value="">Escolha um destino</option>';
-                usersSnap.forEach((d) => { if (d.id !== idLogado) select.innerHTML += `<option value="${d.id}">${d.data().nome}</option>`; });
-                carregarExtrato();
-            } else { alert("Dados incorretos."); }
-        });
-
-        document.getElementById('btnTransferir').addEventListener('click', async () => {
-            const idDestino = document.getElementById('selectDestino').value;
-            const valor = Number(document.getElementById('valorTransferencia').value);
-
-            if (!idDestino || valor <= 0) return alert("Selecione um destino e um valor válido.");
+        window.enviarPix = async () => {
+            const destino = document.getElementById('selectDestinatario').value;
+            const valor = parseFloat(document.getElementById('pixValor').value);
+            
+            if (!destino || isNaN(valor) || valor <= 0) return alert("Selecione um destinatário e um valor válido!");
 
             try {
-                await runTransaction(db, async (transaction) => {
-                    const origemRef = doc(db, "usuarios", idLogado);
-                    const destinoRef = doc(db, "usuarios", idDestino);
-                    const oSnap = await transaction.get(origemRef);
-                    const dSnap = await transaction.get(destinoRef);
-
-                    if (oSnap.data().saldo < valor) throw "Saldo insuficiente!";
-
-                    const novoSaldoOrigem = oSnap.data().saldo - valor;
-                    transaction.update(origemRef, { saldo: novoSaldoOrigem });
-                    transaction.update(destinoRef, { saldo: dSnap.data().saldo + valor });
+                await runTransaction(db, async (t) => {
+                    const remRef = doc(db, "usuarios", contaAtual);
+                    const destRef = doc(db, "usuarios", destino);
+                    const remSnap = await t.get(remRef);
+                    const destSnap = await t.get(destRef);
                     
-                    transaction.set(doc(collection(db, "transacoes")), {
-                        origem: idLogado,
-                        destino: idDestino,
-                        valor: valor,
-                        data: new Date()
-                    });
-
-                    document.getElementById('saldoUsuario').innerText = "R$ " + novoSaldoOrigem.toFixed(2);
+                    if (!remSnap.exists() || remSnap.data().saldo < valor) throw "Saldo insuficiente!";
+                    if (!destSnap.exists()) throw "Conta de destino não encontrada!";
+                    
+                    t.update(remRef, { saldo: remSnap.data().saldo - valor });
+                    t.update(destRef, { saldo: destSnap.data().saldo + valor });
+                    t.set(doc(collection(db, "transacoes")), { origem: contaAtual, destino: destino, valor: valor, data: serverTimestamp() });
                 });
-                alert("Pix realizado com sucesso!");
-                document.getElementById('valorTransferencia').value = "";
-                carregarExtrato();
+                alert("Pix enviado com sucesso!");
+                document.getElementById('divPix').style.display = 'none';
+                document.getElementById('pixValor').value = '';
+                atualizarTudo(); // Atualiza sem recarregar a página
             } catch (e) { alert("Erro: " + e); }
-        });
+        };
+
+        async function atualizarTudo() {
+            const docSnap = await getDoc(doc(db, "usuarios", contaAtual));
+            document.getElementById('saldoAtual').innerText = "R$ " + Number(docSnap.data().saldo).toFixed(2);
+            carregarExtrato();
+        }
+
+        async function carregarExtrato() {
+            const usersSnap = await getDocs(collection(db, "usuarios"));
+            const mapa = { "ADMIN-VANIA": "Administração", "LOJA-VANIA": "Loja da Escola" };
+            usersSnap.forEach((u) => mapa[u.id] = u.data().nome);
+
+            const q = query(collection(db, "transacoes"), or(where("origem", "==", contaAtual), where("destino", "==", contaAtual)));
+            const snap = await getDocs(q);
+            let html = `<table><tr><th>De</th><th>Para</th><th>Valor</th></tr>`;
+            
+            // Ordenar por data (se possível) ou apenas listar
+            snap.forEach((d) => {
+                const t = d.data();
+                html += `<tr><td>${mapa[t.origem] || t.origem}</td><td>${mapa[t.destino] || t.destino}</td><td>R$ ${Number(t.valor).toFixed(2)}</td></tr>`;
+            });
+            document.getElementById('extrato').innerHTML = html + `</table>`;
+        }
     </script>
 </body>
 </html>
