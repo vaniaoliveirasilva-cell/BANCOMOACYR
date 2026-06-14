@@ -12,6 +12,7 @@
         table { width: 100%; margin-top: 20px; border-collapse: collapse; font-size: 13px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #28a745; color: white; }
+        footer { margin-top: 30px; font-size: 12px; color: #666; }
     </style>
 </head>
 <body>
@@ -25,7 +26,8 @@
     </div>
 
     <div class="container" id="areaAluno">
-        <h2 id="tituloNome">Olá, Aluno</h2>
+        <h2 id="tituloBoasVindas">Olá, bem-vindo ao sistema VaniaCoin</h2>
+        <h3 id="tituloNome"></h3>
         <h3>Saldo: <span id="saldoAtual" style="color: #28a745; font-weight: bold;">R$ 0.00</span></h3>
         <button onclick="abrirPix()">Fazer Pix</button>
         
@@ -39,6 +41,8 @@
         <h4>Extrato</h4>
         <div id="extrato">Carregando...</div>
         <button style="background-color: #dc3545;" onclick="window.location.reload()">Sair</button>
+        
+        <footer>Criado e desenvolvido por Vania Oliveira</footer>
     </div>
 
     <script type="module">
@@ -58,7 +62,8 @@
                 contaAtual = id;
                 document.getElementById('loginBox').style.display = 'none';
                 document.getElementById('areaAluno').style.display = 'block';
-                document.getElementById('tituloNome').innerText = "Olá, " + docSnap.data().nome;
+                // Saudação personalizada
+                document.getElementById('tituloBoasVindas').innerText = "Olá, " + docSnap.data().nome + ", bem-vindo ao sistema VaniaCoin";
                 atualizarTudo();
             } else { alert("Dados incorretos!"); }
         };
@@ -99,7 +104,7 @@
                 alert("Pix enviado com sucesso!");
                 document.getElementById('divPix').style.display = 'none';
                 document.getElementById('pixValor').value = '';
-                atualizarTudo(); // Atualiza sem recarregar a página
+                atualizarTudo();
             } catch (e) { alert("Erro: " + e); }
         };
 
@@ -118,7 +123,6 @@
             const snap = await getDocs(q);
             let html = `<table><tr><th>De</th><th>Para</th><th>Valor</th></tr>`;
             
-            // Ordenar por data (se possível) ou apenas listar
             snap.forEach((d) => {
                 const t = d.data();
                 html += `<tr><td>${mapa[t.origem] || t.origem}</td><td>${mapa[t.destino] || t.destino}</td><td>R$ ${Number(t.valor).toFixed(2)}</td></tr>`;
