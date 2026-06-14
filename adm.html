@@ -34,7 +34,6 @@
         <button style="background-color: #ffc107; color: black; width: 280px;" id="btnExportar">📤 Exportar Extrato</button>
         <button style="background-color: #dc3545; width: 280px;" onclick="window.location.reload()">Sair do Painel</button>
 
-        <!-- ... manter o resto do HTML igual (formCadastro, tabela, footer) ... -->
         <div id="formCadastro" class="box">
             <h2 style="color: #28a745;">Dados do Novo Aluno</h2>
             <input type="text" id="novoConta" placeholder="Conta (9 dígitos)">
@@ -63,31 +62,73 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // [Login e Funções de Listar permanecem iguais aos anteriores...]
-        // ... (Adicione aqui a lógica de login e listarUsuarios)
+        document.getElementById('btnAcessar').onclick = () => {
+            if(document.getElementById('senhaAdm').value === SENHA_SECRETA) {
+                document.getElementById('loginAdmin').style.display = 'none';
+                document.getElementById('painel').style.display = 'block';
+                listarUsuarios();
+            } else { alert("Senha incorreta!"); }
+        };
 
-        // NOVA FUNÇÃO DE IMPORTAÇÃO
+        document.getElementById('btnAbrirCadastro').onclick = () => document.getElementById('formCadastro').style.display = 'block';
+        document.getElementById('btnFechar').onclick = () => document.getElementById('formCadastro').style.display = 'none';
+
+        async function listarUsuarios() {
+            const querySnapshot = await getDocs(collection(db, "usuarios"));
+            const tbody = document.getElementById('tabelaUsuarios');
+            tbody.innerHTML = '';
+            querySnapshot.forEach((d) => {
+                const u = d.data();
+                tbody.innerHTML += `<tr><td>${d.id}</td><td>${u.nome}</td><td>${u.senha}</td><td>R$ ${Number(u.saldo).toFixed(2)}</td></tr>`;
+            });
+        }
+
+        document.getElementById('btnSalvar').onclick = async () => {
+            const id = document.getElementById('novoConta').value + "-" + document.getElementById('novoDigito').value;
+            await setDoc(doc(db, "usuarios", id), {
+                nome: document.getElementById('novoNome').value,
+                senha: document.getElementById('novaSenha').value,
+                saldo: Number(document.getElementById('novoSaldo').value)
+            });
+            alert("Sucesso!");
+            document.getElementById('formCadastro').style.display = 'none';
+            listarUsuarios();
+        };
+
         document.getElementById('fileInput').onchange = (e) => {
             const file = e.target.files[0];
             const reader = new FileReader();
             reader.onload = async (event) => {
-                const text = event.target.result;
-                const linhas = text.split('\n');
-                for (let i = 1; i < linhas.length; i++) { // pula o cabeçalho
-                    const [conta, digito, nome, senha, saldo] = linhas[i].split(';');
-                    if (conta) {
-                        await setDoc(doc(db, "usuarios", `${conta}-${digito}`), {
-                            nome: nome, senha: senha, saldo: Number(saldo)
+                const linhas = event.target.result.split('\n');
+                for (let i = 1; i < linhas.length; i++) {
+                    const colunas = linhas[i].split(';');
+                    if (colunas.length >= 5) {
+                        await setDoc(doc(db, "usuarios", `${colunas[0]}-${colunas[1]}`), {
+                            nome: colunas[2], senha: colunas[3], saldo: Number(colunas[4])
                         });
                     }
                 }
                 alert("Importação concluída!");
                 listarUsuarios();
             };
-            reader.readAsText(file);
+            reader.readText(file);
         };
-        
-        // ... (restante do código de Salvar, Exportar, etc)
+
+        document.getElementById('btnExportar').onclick = async () => {
+            const usersSnap = await getDocs(collection(db, "usuarios"));
+            const mapaNomes = {};
+            usersSnap.forEach((u) => { mapaNomes[u.id] = u.data().nome; });
+            const transacoesSnap = await getDocs(collection(db, "transacoes"));
+            let csv = "\uFEFFOrigem;Destino;Valor;Data\n";
+            transacoesSnap.forEach((d) => {
+                const t = d.data();
+                csv += `${mapaNomes[t.origem] || t.origem};${mapaNomes[t.destino] || t.destino};${t.valor.toFixed(2)};${t.data.toDate().toLocaleString()}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url; link.download = "extrato_vaniacoin.csv"; link.click();
+        };
     </script>
 </body>
 </html>
