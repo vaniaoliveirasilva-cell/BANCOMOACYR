@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Administração - Banco da Feira</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; }
+        .box { border: 2px solid #28a745; padding: 20px; border-radius: 8px; width: 400px; background: white; margin-bottom: 20px; display: none; }
+        #loginAdmin { text-align: center; margin-top: 50px; }
+        input { display: block; width: 90%; margin: 10px auto; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background-color: #28a745; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; width: 95%; margin: 5px; }
+        table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #28a745; color: white; }
+    </style>
+</head>
+<body>
+
+    <div id="loginAdmin">
+        <h2>Acesso Administrativo</h2>
+        <input type="password" id="senhaAdm" placeholder="Digite a senha secreta">
+        <button id="btnAcessar">Entrar no Painel</button>
+    </div>
+
+    <div id="painel" style="display: none;">
+        <h1>Painel Administrativo</h1>
+        <button id="btnAbrirCadastro" style="width: 250px;">+ Cadastrar Novo Usuário</button>
+        <button style="background-color: #ffc107; color: black;" id="btnExportar">Exportar Extrato (Excel/CSV)</button>
+        <button style="background-color: #dc3545;" onclick="window.location.reload()">Sair do Painel</button>
+
+        <div id="formCadastro" class="box">
+            <h2 style="color: #28a745;">Dados do Novo Aluno</h2>
+            <input type="text" id="novoConta" placeholder="Conta (9 dígitos)">
+            <input type="text" id="novoDigito" placeholder="Dígito (1 dígito)">
+            <input type="text" id="novoNome" placeholder="Nome do Aluno">
+            <input type="text" id="novaSenha" placeholder="Senha">
+            <input type="number" id="novoSaldo" placeholder="Saldo Inicial">
+            <button id="btnSalvar">Salvar no Banco</button>
+            <button id="btnFechar" style="background-color: #6c757d;">Cancelar</button>
+        </div>
+
+        <h2>Usuários Cadastrados</h2>
+        <table>
+            <thead>
+                <tr><th>Conta-DV</th><th>Nome</th><th>Senha</th><th>Saldo</th></tr>
+            </thead>
+            <tbody id="tabelaUsuarios"></tbody>
+        </table>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+        const SENHA_SECRETA = "9844";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAMUE6hQs4lfLXKvWmSKS1k5k6brLvUH18",
+            authDomain: "banco-eletiva.firebaseapp.com",
+            projectId: "banco-eletiva",
+            storageBucket: "banco-eletiva.firebasestorage.app",
+            messagingSenderId: "5630766462",
+            appId: "1:5630766462:web:275544449d2b58e154d72f",
+            measurementId: "G-J9FK5M1LY5"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        document.getElementById('btnAcessar').onclick = () => {
+            if(document.getElementById('senhaAdm').value === SENHA_SECRETA) {
+                document.getElementById('loginAdmin').style.display = 'none';
+                document.getElementById('painel').style.display = 'block';
+                listarUsuarios();
+            } else { alert("Senha incorreta!"); }
+        };
+
+        document.getElementById('btnAbrirCadastro').onclick = () => document.getElementById('formCadastro').style.display = 'block';
+        document.getElementById('btnFechar').onclick = () => document.getElementById('formCadastro').style.display = 'none';
+
+        async function listarUsuarios() {
+            const querySnapshot = await getDocs(collection(db, "usuarios"));
+            const tbody = document.getElementById('tabelaUsuarios');
+            tbody.innerHTML = '';
+            querySnapshot.forEach((d) => {
+                const u = d.data();
+                tbody.innerHTML += `<tr><td>${d.id}</td><td>${u.nome}</td><td>${u.senha}</td><td>R$ ${Number(u.saldo).toFixed(2)}</td></tr>`;
+            });
+        }
+
+        document.getElementById('btnSalvar').onclick = async () => {
+            const id = document.getElementById('novoConta').value + "-" + document.getElementById('novoDigito').value;
+            await setDoc(doc(db, "usuarios", id), {
+                nome: document.getElementById('novoNome').value,
+                senha: document.getElementById('novaSenha').value,
+                saldo: Number(document.getElementById('novoSaldo').value)
+            });
+            alert("Sucesso!");
+            document.getElementById('formCadastro').style.display = 'none';
+            listarUsuarios();
+        };
+
+        // Exportar para Excel (CSV) com nomes
+        document.getElementById('btnExportar').onclick = async () => {
+            // Cria um mapa de ID -> Nome
+            const usersSnap = await getDocs(collection(db, "usuarios"));
+            const mapaNomes = {};
+            usersSnap.forEach((u) => { mapaNomes[u.id] = u.data().nome; });
+
+            const transacoesSnap = await getDocs(collection(db, "transacoes"));
+            let csvContent = "\uFEFFOrigem;Destino;Valor;Data\n"; 
+
+            transacoesSnap.forEach((d) => {
+                const t = d.data();
+                const nomeOrigem = mapaNomes[t.origem] || t.origem;
+                const nomeDestino = mapaNomes[t.destino] || t.destino;
+                const dataFormatada = t.data.toDate().toLocaleString();
+                const valorFormatado = t.valor.toFixed(2).replace('.', ',');
+                csvContent += `${nomeOrigem};${nomeDestino};${valorFormatado};${dataFormatada}\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "extrato_completo.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+    </script>
+</body>
+</html>

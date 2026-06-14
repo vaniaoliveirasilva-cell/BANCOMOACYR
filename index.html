@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Banco da Feira - Aluno</title>
+    <style>
+        body { font-family: Arial, sans-serif; display: flex; justify-content: center; padding-top: 20px; background-color: #f4f4f9; }
+        .box { border: 1px solid #ccc; padding: 20px; border-radius: 8px; width: 350px; text-align: center; background: white; margin: 10px; }
+        input, select { display: block; width: 90%; margin: 10px auto; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background-color: #007bff; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; width: 95%; margin-top: 10px; }
+        #telaPrincipal { display: none; }
+        .extrato-item { border-bottom: 1px solid #eee; padding: 8px; font-size: 0.9em; text-align: left; }
+        .enviado { color: #dc3545; } 
+        .recebido { color: #28a745; }
+    </style>
+</head>
+<body>
+
+    <div id="telaLogin" class="box">
+        <h2>Login Aluno</h2>
+        <input type="text" id="conta" placeholder="Conta" maxlength="9">
+        <input type="text" id="digito" placeholder="Dígito" maxlength="1">
+        <input type="password" id="senha" placeholder="Senha">
+        <button id="btnEntrar">Entrar</button>
+    </div>
+
+    <div id="telaPrincipal" class="box">
+        <h2 id="nomeUsuario"></h2>
+        <p>Saldo Atual:</p>
+        <h1 id="saldoUsuario">R$ 0,00</h1>
+        
+        <hr>
+        
+        <h3>Realizar Pix</h3>
+        <select id="selectDestino"><option value="">Carregando usuários...</option></select>
+        <input type="number" id="valorTransferencia" placeholder="Valor (R$)">
+        <button id="btnTransferir" style="background-color: #28a745;">Confirmar Pix</button>
+        
+        <div style="margin-top: 20px; text-align: left;">
+            <h3>Seu Extrato:</h3>
+            <div id="listaExtrato"></div>
+        </div>
+
+        <button style="background-color: #6c757d;" onclick="location.reload()">Sair</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+        import { getFirestore, doc, getDoc, getDocs, collection, runTransaction, query, orderBy } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAMUE6hQs4lfLXKvWmSKS1k5k6brLvUH18",
+            authDomain: "banco-eletiva.firebaseapp.com",
+            projectId: "banco-eletiva",
+            storageBucket: "banco-eletiva.firebasestorage.app",
+            messagingSenderId: "5630766462",
+            appId: "1:5630766462:web:275544449d2b58e154d72f",
+            measurementId: "G-J9FK5M1LY5"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        let idLogado = "";
+
+        async function carregarExtrato() {
+            const lista = document.getElementById('listaExtrato');
+            lista.innerHTML = 'Carregando...';
+            const q = query(collection(db, "transacoes"), orderBy("data", "desc"));
+            const querySnapshot = await getDocs(q);
+            lista.innerHTML = '';
+            querySnapshot.forEach((d) => {
+                const t = d.data();
+                if (t.origem === idLogado) {
+                    lista.innerHTML += `<div class="extrato-item enviado">📤 Para ${t.destino}: -R$ ${Number(t.valor).toFixed(2)}</div>`;
+                } else if (t.destino === idLogado) {
+                    lista.innerHTML += `<div class="extrato-item recebido">📥 De ${t.origem}: +R$ ${Number(t.valor).toFixed(2)}</div>`;
+                }
+            });
+        }
+
+        document.getElementById('btnEntrar').addEventListener('click', async () => {
+            idLogado = document.getElementById('conta').value + "-" + document.getElementById('digito').value;
+            const senha = document.getElementById('senha').value;
+            const docSnap = await getDoc(doc(db, "usuarios", idLogado));
+            if (docSnap.exists() && docSnap.data().senha === senha) {
+                document.getElementById('telaLogin').style.display = 'none';
+                document.getElementById('telaPrincipal').style.display = 'block';
+                document.getElementById('nomeUsuario').innerText = "Olá, " + docSnap.data().nome;
+                document.getElementById('saldoUsuario').innerText = "R$ " + Number(docSnap.data().saldo).toFixed(2);
+                
+                const usersSnap = await getDocs(collection(db, "usuarios"));
+                const select = document.getElementById('selectDestino');
+                select.innerHTML = '<option value="">Escolha um destino</option>';
+                usersSnap.forEach((d) => { if (d.id !== idLogado) select.innerHTML += `<option value="${d.id}">${d.data().nome}</option>`; });
+                carregarExtrato();
+            } else { alert("Dados incorretos."); }
+        });
+
+        document.getElementById('btnTransferir').addEventListener('click', async () => {
+            const idDestino = document.getElementById('selectDestino').value;
+            const valor = Number(document.getElementById('valorTransferencia').value);
+
+            if (!idDestino || valor <= 0) return alert("Selecione um destino e um valor válido.");
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const origemRef = doc(db, "usuarios", idLogado);
+                    const destinoRef = doc(db, "usuarios", idDestino);
+                    const oSnap = await transaction.get(origemRef);
+                    const dSnap = await transaction.get(destinoRef);
+
+                    if (oSnap.data().saldo < valor) throw "Saldo insuficiente!";
+
+                    const novoSaldoOrigem = oSnap.data().saldo - valor;
+                    transaction.update(origemRef, { saldo: novoSaldoOrigem });
+                    transaction.update(destinoRef, { saldo: dSnap.data().saldo + valor });
+                    
+                    transaction.set(doc(collection(db, "transacoes")), {
+                        origem: idLogado,
+                        destino: idDestino,
+                        valor: valor,
+                        data: new Date()
+                    });
+
+                    // Atualiza o saldo na tela instantaneamente
+                    document.getElementById('saldoUsuario').innerText = "R$ " + novoSaldoOrigem.toFixed(2);
+                });
+                alert("Pix realizado com sucesso!");
+                document.getElementById('valorTransferencia').value = ""; // Limpa o campo
+                carregarExtrato(); // Atualiza o extrato
+            } catch (e) { alert("Erro: " + e); }
+        });
+    </script>
+</body>
+</html>
