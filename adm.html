@@ -2,28 +2,32 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Administração - Banco da Feira</title>
+    <title>Administração - VaniaCoin</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; background-color: #f4f4f9; }
         .box { border: 2px solid #28a745; padding: 20px; border-radius: 8px; width: 400px; background: white; margin-bottom: 20px; display: none; }
         #loginAdmin { text-align: center; margin-top: 50px; }
+        .logo-header { color: #28a745; font-weight: bold; font-size: 24px; margin-bottom: 10px; }
         input { display: block; width: 90%; margin: 10px auto; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
-        button { background-color: #28a745; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; width: 95%; margin: 5px; }
+        button { background-color: #28a745; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; width: 95%; margin: 5px; transition: 0.3s; }
+        button:hover { opacity: 0.8; }
         table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
         th { background-color: #28a745; color: white; }
+        footer { margin-top: 30px; text-align: center; color: #777; font-size: 0.9em; }
     </style>
 </head>
 <body>
 
     <div id="loginAdmin">
+        <div class="logo-header">VaniaCoin Admin</div>
         <h2>Acesso Administrativo</h2>
         <input type="password" id="senhaAdm" placeholder="Digite a senha secreta">
         <button id="btnAcessar">Entrar no Painel</button>
     </div>
 
     <div id="painel" style="display: none;">
-        <h1>Painel Administrativo</h1>
+        <div class="logo-header">VaniaCoin - Painel de Controle</div>
         <button id="btnAbrirCadastro" style="width: 250px;">+ Cadastrar Novo Usuário</button>
         <button style="background-color: #ffc107; color: black;" id="btnExportar">Exportar Extrato (Excel/CSV)</button>
         <button style="background-color: #dc3545;" onclick="window.location.reload()">Sair do Painel</button>
@@ -46,6 +50,8 @@
             </thead>
             <tbody id="tabelaUsuarios"></tbody>
         </table>
+        
+        <footer>Projeto desenvolvido por Vania Oliveira | VaniaCoin © 2026</footer>
     </div>
 
     <script type="module">
@@ -53,17 +59,7 @@
         import { getFirestore, doc, setDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
         const SENHA_SECRETA = "9844";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyAMUE6hQs4lfLXKvWmSKS1k5k6brLvUH18",
-            authDomain: "banco-eletiva.firebaseapp.com",
-            projectId: "banco-eletiva",
-            storageBucket: "banco-eletiva.firebasestorage.app",
-            messagingSenderId: "5630766462",
-            appId: "1:5630766462:web:275544449d2b58e154d72f",
-            measurementId: "G-J9FK5M1LY5"
-        };
-
+        const firebaseConfig = { apiKey: "AIzaSyAMUE6hQs4lfLXKvWmSKS1k5k6brLvUH18", authDomain: "banco-eletiva.firebaseapp.com", projectId: "banco-eletiva", storageBucket: "banco-eletiva.firebasestorage.app", messagingSenderId: "5630766462", appId: "1:5630766462:web:275544449d2b58e154d72f", measurementId: "G-J9FK5M1LY5" };
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
@@ -100,9 +96,7 @@
             listarUsuarios();
         };
 
-        // Exportar para Excel (CSV) com nomes
         document.getElementById('btnExportar').onclick = async () => {
-            // Cria um mapa de ID -> Nome
             const usersSnap = await getDocs(collection(db, "usuarios"));
             const mapaNomes = {};
             usersSnap.forEach((u) => { mapaNomes[u.id] = u.data().nome; });
@@ -123,7 +117,7 @@
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.setAttribute("href", url);
-            link.setAttribute("download", "extrato_completo.csv");
+            link.setAttribute("download", "extrato_vaniacoin.csv");
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
