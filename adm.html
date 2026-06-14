@@ -14,11 +14,9 @@
         table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
         th { background-color: #28a745; color: white; }
-        
         .btn-excluir, .btn-ajuste { padding: 2px 6px; font-size: 10px; margin: 2px; width: auto; }
         .btn-excluir { background-color: #dc3545; }
         .btn-ajuste { background-color: #007bff; }
-        
         footer { margin-top: 30px; text-align: center; color: #777; font-size: 0.9em; }
     </style>
 </head>
@@ -43,7 +41,7 @@
             <h2 style="color: #28a745;">Cadastrar Aluno</h2>
             <input type="text" id="novoConta" placeholder="Conta (9 dígitos)">
             <input type="text" id="novoDigito" placeholder="Dígito (1 dígito)">
-            <input type="text" id="novoNome" placeholder="Nome do Aluno">
+            <input type="text" id="novoNome" placeholder="Nome">
             <input type="text" id="novaSenha" placeholder="Senha">
             <input type="number" id="novoSaldo" placeholder="Saldo Inicial">
             <button id="btnSalvar">Salvar</button>
@@ -55,7 +53,7 @@
             <thead><tr><th>Conta-DV</th><th>Nome</th><th>Saldo</th><th>Ações</th></tr></thead>
             <tbody id="tabelaUsuarios"></tbody>
         </table>
-        <footer>Projeto desenvolvido por Vania Oliveira | Banco VaniaCoin © 2026</footer>
+        <footer>VaniaCoin © 2026</footer>
     </div>
 
     <script type="module">
@@ -74,25 +72,30 @@
             } else { alert("Senha incorreta!"); }
         };
 
-        window.ajustarSaldo = async (id, nomeAtual, saldoAtual) => {
-            const valor = parseFloat(prompt(`Ajustar saldo de ${nomeAtual} (atual: R$ ${saldoAtual.toFixed(2)}).\nUse negativo para retirar ou positivo para adicionar:`));
-            if (isNaN(valor)) return;
-            const motivo = prompt("Qual o motivo deste ajuste?");
-            if (!motivo) return alert("O motivo é obrigatório!");
-
-            await runTransaction(db, async (t) => {
-                const userRef = doc(db, "usuarios", id);
-                t.update(userRef, { saldo: saldoAtual + valor });
-                t.set(doc(collection(db, "transacoes")), {
-                    origem: "ADMIN-VANIA",
-                    destino: id,
-                    valor: valor,
-                    motivo: motivo,
-                    data: new Date()
-                });
-            });
-            alert("Ajuste registrado no extrato!");
-            listarUsuarios();
+        // IMPORTAÇÃO CORRIGIDA
+        document.getElementById('fileInput').onchange = (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                const texto = event.target.result;
+                const linhas = texto.split(/\r?\n/);
+                for (let i = 1; i < linhas.length; i++) {
+                    const colunas = linhas[i].split(';');
+                    if (colunas.length >= 5) {
+                        try {
+                            const id = `${colunas[0].trim()}-${colunas[1].trim()}`;
+                            await setDoc(doc(db, "usuarios", id), {
+                                nome: colunas[2].trim(),
+                                senha: colunas[3].trim(),
+                                saldo: parseFloat(colunas[4]) || 0
+                            });
+                        } catch (err) { console.error("Erro na linha " + i, err); }
+                    }
+                }
+                alert("Importação concluída!");
+                listarUsuarios();
+            };
+            reader.readAsText(file, "UTF-8");
         };
 
         async function listarUsuarios() {
@@ -101,63 +104,35 @@
             tbody.innerHTML = '';
             snap.forEach((d) => {
                 const u = d.data();
-                tbody.innerHTML += `<tr><td>${d.id}</td><td>${u.nome}</td><td>R$ ${Number(u.saldo).toFixed(2)}</td>
-                <td><button class="btn-ajuste" onclick="ajustarSaldo('${d.id}', '${u.nome}', ${u.saldo})">Ajustar</button>
+                tbody.innerHTML += `<tr><td>${d.id}</td><td>${u.nome}</td><td>R$ ${Number(u.saldo || 0).toFixed(2)}</td>
+                <td><button class="btn-ajuste" onclick="ajustarSaldo('${d.id}', '${u.nome}', ${u.saldo || 0})">Ajustar</button>
                 <button class="btn-excluir" onclick="excluirUsuario('${d.id}')">Excluir</button></td></tr>`;
             });
         }
 
-        window.excluirUsuario = async (id) => { if(confirm("Confirmar exclusão?")) { await deleteDoc(doc(db, "usuarios", id)); listarUsuarios(); } };
-
-        document.getElementById('fileInput').onchange = (e) => {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.readAsText(file, 'UTF-8');
-            reader.onload = async (event) => {
-                const linhas = event.target.result.split('\n');
-                for (let i = 1; i < linhas.length; i++) {
-                    const colunas = linhas[i].split(';');
-                    if (colunas.length >= 5) {
-                        await setDoc(doc(db, "usuarios", `${colunas[0].trim()}-${colunas[1].trim()}`), {
-                            nome: colunas[2].trim(), senha: colunas[3].trim(), saldo: Number(colunas[4])
-                        });
-                    }
-                }
-                alert("Importação concluída!");
+        window.ajustarSaldo = async (id, nomeAtual, saldoAtual) => {
+            const valor = parseFloat(prompt(`Ajustar ${nomeAtual} (Saldo: R$ ${saldoAtual.toFixed(2)}):`));
+            const motivo = prompt("Motivo do ajuste:");
+            if (!isNaN(valor) && motivo) {
+                await runTransaction(db, async (t) => {
+                    t.update(doc(db, "usuarios", id), { saldo: saldoAtual + valor });
+                    t.set(doc(collection(db, "transacoes")), { origem: "ADMIN-VANIA", destino: id, valor, motivo, data: new Date() });
+                });
                 listarUsuarios();
-            };
+            }
         };
 
+        window.excluirUsuario = async (id) => { if(confirm("Excluir?")) { await deleteDoc(doc(db, "usuarios", id)); listarUsuarios(); } };
+        
         document.getElementById('btnSalvar').onclick = async () => {
             const id = document.getElementById('novoConta').value + "-" + document.getElementById('novoDigito').value;
-            await setDoc(doc(db, "usuarios", id), {
-                nome: document.getElementById('novoNome').value,
-                senha: document.getElementById('novaSenha').value,
-                saldo: Number(document.getElementById('novoSaldo').value)
-            });
-            alert("Sucesso!");
+            await setDoc(doc(db, "usuarios", id), { nome: document.getElementById('novoNome').value, senha: document.getElementById('novaSenha').value, saldo: parseFloat(document.getElementById('novoSaldo').value) || 0 });
             document.getElementById('formCadastro').style.display = 'none';
             listarUsuarios();
         };
 
         document.getElementById('btnAbrirCadastro').onclick = () => document.getElementById('formCadastro').style.display = 'block';
         document.getElementById('btnFechar').onclick = () => document.getElementById('formCadastro').style.display = 'none';
-
-        document.getElementById('btnExportar').onclick = async () => {
-            const usersSnap = await getDocs(collection(db, "usuarios"));
-            const mapaNomes = {};
-            usersSnap.forEach((u) => { mapaNomes[u.id] = u.data().nome; });
-            const transacoesSnap = await getDocs(collection(db, "transacoes"));
-            let csv = "\uFEFFOrigem;Destino;Valor;Motivo;Data\n"; // Adicionado coluna motivo
-            transacoesSnap.forEach((d) => {
-                const t = d.data();
-                csv += `${mapaNomes[t.origem] || t.origem};${mapaNomes[t.destino] || t.destino};${t.valor.toFixed(2)};${t.motivo || "Pix"};${t.data.toDate().toLocaleString()}\n`;
-            });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url; link.download = "extrato_completo_vaniacoin.csv"; link.click();
-        };
     </script>
 </body>
 </html>
