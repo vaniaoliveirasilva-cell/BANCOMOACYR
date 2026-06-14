@@ -14,6 +14,7 @@
         table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
         th { background-color: #28a745; color: white; }
+        .btn-excluir { background-color: #dc3545; padding: 5px 10px; font-size: 12px; }
         footer { margin-top: 30px; text-align: center; color: #777; font-size: 0.9em; }
     </style>
 </head>
@@ -47,7 +48,7 @@
 
         <h2>Usuários Cadastrados</h2>
         <table>
-            <thead><tr><th>Conta-DV</th><th>Nome</th><th>Senha</th><th>Saldo</th></tr></thead>
+            <thead><tr><th>Conta-DV</th><th>Nome</th><th>Senha</th><th>Saldo</th><th>Ação</th></tr></thead>
             <tbody id="tabelaUsuarios"></tbody>
         </table>
         <footer>Projeto desenvolvido por Vania Oliveira | Banco VaniaCoin © 2026</footer>
@@ -55,13 +56,14 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDocs, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
         const SENHA_SECRETA = "9844";
         const firebaseConfig = { apiKey: "AIzaSyAMUE6hQs4lfLXKvWmSKS1k5k6brLvUH18", authDomain: "banco-eletiva.firebaseapp.com", projectId: "banco-eletiva", storageBucket: "banco-eletiva.firebasestorage.app", messagingSenderId: "5630766462", appId: "1:5630766462:web:275544449d2b58e154d72f", measurementId: "G-J9FK5M1LY5" };
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        // Funções de login e listagem
         document.getElementById('btnAcessar').onclick = () => {
             if(document.getElementById('senhaAdm').value === SENHA_SECRETA) {
                 document.getElementById('loginAdmin').style.display = 'none';
@@ -70,18 +72,44 @@
             } else { alert("Senha incorreta!"); }
         };
 
-        document.getElementById('btnAbrirCadastro').onclick = () => document.getElementById('formCadastro').style.display = 'block';
-        document.getElementById('btnFechar').onclick = () => document.getElementById('formCadastro').style.display = 'none';
-
         async function listarUsuarios() {
             const querySnapshot = await getDocs(collection(db, "usuarios"));
             const tbody = document.getElementById('tabelaUsuarios');
             tbody.innerHTML = '';
             querySnapshot.forEach((d) => {
                 const u = d.data();
-                tbody.innerHTML += `<tr><td>${d.id}</td><td>${u.nome}</td><td>${u.senha}</td><td>R$ ${Number(u.saldo).toFixed(2)}</td></tr>`;
+                tbody.innerHTML += `<tr><td>${d.id}</td><td>${u.nome}</td><td>${u.senha}</td><td>R$ ${Number(u.saldo).toFixed(2)}</td>
+                <td><button class="btn-excluir" onclick="excluirUsuario('${d.id}')">Excluir</button></td></tr>`;
             });
         }
+
+        // Tornar função global para o HTML achar
+        window.excluirUsuario = async (id) => {
+            if(confirm("Tem certeza que deseja excluir este usuário?")) {
+                await deleteDoc(doc(db, "usuarios", id));
+                listarUsuarios();
+            }
+        };
+
+        document.getElementById('fileInput').onchange = (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            // A chave para acentos é usar o charset correto
+            reader.readAsText(file, 'UTF-8'); 
+            reader.onload = async (event) => {
+                const linhas = event.target.result.split('\n');
+                for (let i = 1; i < linhas.length; i++) {
+                    const colunas = linhas[i].split(';');
+                    if (colunas.length >= 5) {
+                        await setDoc(doc(db, "usuarios", `${colunas[0].trim()}-${colunas[1].trim()}`), {
+                            nome: colunas[2].trim(), senha: colunas[3].trim(), saldo: Number(colunas[4])
+                        });
+                    }
+                }
+                alert("Importação concluída!");
+                listarUsuarios();
+            };
+        };
 
         document.getElementById('btnSalvar').onclick = async () => {
             const id = document.getElementById('novoConta').value + "-" + document.getElementById('novoDigito').value;
@@ -91,28 +119,11 @@
                 saldo: Number(document.getElementById('novoSaldo').value)
             });
             alert("Sucesso!");
-            document.getElementById('formCadastro').style.display = 'none';
             listarUsuarios();
         };
 
-        document.getElementById('fileInput').onchange = (e) => {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = async (event) => {
-                const linhas = event.target.result.split('\n');
-                for (let i = 1; i < linhas.length; i++) {
-                    const colunas = linhas[i].split(';');
-                    if (colunas.length >= 5) {
-                        await setDoc(doc(db, "usuarios", `${colunas[0]}-${colunas[1]}`), {
-                            nome: colunas[2], senha: colunas[3], saldo: Number(colunas[4])
-                        });
-                    }
-                }
-                alert("Importação concluída!");
-                listarUsuarios();
-            };
-            reader.readText(file);
-        };
+        document.getElementById('btnAbrirCadastro').onclick = () => document.getElementById('formCadastro').style.display = 'block';
+        document.getElementById('btnFechar').onclick = () => document.getElementById('formCadastro').style.display = 'none';
 
         document.getElementById('btnExportar').onclick = async () => {
             const usersSnap = await getDocs(collection(db, "usuarios"));
