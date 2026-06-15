@@ -14,8 +14,8 @@
         th { background-color: #28a745; color: white; }
         footer { margin-top: 30px; font-size: 12px; color: #666; }
         /* Cores do Extrato */
-        .cor-envio { color: #dc3545; font-weight: bold; }
-        .cor-recebimento { color: #007bff; font-weight: bold; }
+        .cor-envio { color: #dc3545; font-weight: bold; } /* Vermelho para quem pagou */
+        .cor-recebimento { color: #007bff; font-weight: bold; } /* Azul para quem recebeu */
     </style>
 </head>
 <body>
@@ -50,7 +50,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, getDocs, collection, query, where, or, runTransaction, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, getDocs, collection, query, where, or, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
         const db = getFirestore(initializeApp({ apiKey: "AIzaSyAMUE6hQs4lfLXKvWmSKS1k5k6brLvUH18", authDomain: "banco-eletiva.firebaseapp.com", projectId: "banco-eletiva", storageBucket: "banco-eletiva.firebasestorage.app", messagingSenderId: "5630766462", appId: "1:5630766462:web:275544449d2b58e154d72f", measurementId: "G-J9FK5M1LY5" }));
 
@@ -113,19 +113,29 @@
             const mapa = { "ADMIN-VANIA": "Adm", "LOJA-VANIA": "Loja Escola" };
             usersSnap.forEach((u) => mapa[u.id] = u.data().nome);
 
-            const q = query(collection(db, "transacoes"), or(where("origem", "==", contaAtual), where("destino", "==", contaAtual)), orderBy("data", "desc"));
+            // Consulta sem orderBy para evitar erro de índice
+            const q = query(collection(db, "transacoes"), or(where("origem", "==", contaAtual), where("destino", "==", contaAtual)));
             const snap = await getDocs(q);
             
-            let html = `<table><tr><th>Data</th><th>Movimentação</th><th>Valor</th></tr>`;
+            let transacoes = [];
             snap.forEach((d) => {
-                const t = d.data();
+                let t = d.data();
+                transacoes.push(t);
+            });
+
+            // Ordena manualmente pela data (do mais novo para o mais antigo)
+            transacoes.sort((a, b) => b.data.seconds - a.data.seconds);
+
+            let html = `<table><tr><th>Data</th><th>Movimentação</th><th>Valor</th></tr>`;
+            transacoes.forEach((t) => {
                 const data = t.data ? t.data.toDate().toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) : "--/-- --:--";
                 
                 const ehEnvio = t.origem === contaAtual;
                 const classe = ehEnvio ? "cor-envio" : "cor-recebimento";
+                const sinal = ehEnvio ? "-" : "+";
                 const texto = ehEnvio ? "Para: " + (mapa[t.destino] || t.destino) : "De: " + (mapa[t.origem] || t.origem);
 
-                html += `<tr class="${classe}"><td>${data}</td><td>${texto}</td><td>R$ ${Number(t.valor).toFixed(2)}</td></tr>`;
+                html += `<tr class="${classe}"><td>${data}</td><td>${texto}</td><td>${sinal} R$ ${Number(t.valor).toFixed(2)}</td></tr>`;
             });
             document.getElementById('extrato').innerHTML = html + `</table>`;
         }
