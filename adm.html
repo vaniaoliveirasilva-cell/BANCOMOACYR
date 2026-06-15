@@ -72,24 +72,41 @@
             } else { alert("Senha incorreta!"); }
         };
 
-        // IMPORTAÇÃO CORRIGIDA
+        // Lógica do botão Exportar CSV corrigida
+        document.getElementById('btnExportar').onclick = async () => {
+            const snap = await getDocs(collection(db, "transacoes"));
+            let csvContent = "Origem;Destino;Valor;Data\n";
+            
+            snap.forEach((doc) => {
+                const t = doc.data();
+                const data = t.data && t.data.toDate ? t.data.toDate().toLocaleString() : "N/A";
+                csvContent += `${t.origem};${t.destino};${t.valor};${data}\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "extrato_transacoes.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
         document.getElementById('fileInput').onchange = (e) => {
             const file = e.target.files[0];
             const reader = new FileReader();
             reader.onload = async (event) => {
-                const texto = event.target.result;
-                const linhas = texto.split(/\r?\n/);
+                const linhas = event.target.result.split(/\r?\n/);
                 for (let i = 1; i < linhas.length; i++) {
                     const colunas = linhas[i].split(';');
                     if (colunas.length >= 5) {
-                        try {
-                            const id = `${colunas[0].trim()}-${colunas[1].trim()}`;
-                            await setDoc(doc(db, "usuarios", id), {
-                                nome: colunas[2].trim(),
-                                senha: colunas[3].trim(),
-                                saldo: parseFloat(colunas[4]) || 0
-                            });
-                        } catch (err) { console.error("Erro na linha " + i, err); }
+                        const id = `${colunas[0].trim()}-${colunas[1].trim()}`;
+                        await setDoc(doc(db, "usuarios", id), {
+                            nome: colunas[2].trim(),
+                            senha: colunas[3].trim(),
+                            saldo: parseFloat(colunas[4]) || 0
+                        });
                     }
                 }
                 alert("Importação concluída!");
