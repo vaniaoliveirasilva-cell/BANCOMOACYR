@@ -72,27 +72,39 @@
             } else { alert("Senha incorreta!"); }
         };
 
-        // Lógica do botão Exportar CSV corrigida
+        // Exportação com nomes
         document.getElementById('btnExportar').onclick = async () => {
-            const snap = await getDocs(collection(db, "transacoes"));
+            const usersSnap = await getDocs(collection(db, "usuarios"));
+            const transacoesSnap = await getDocs(collection(db, "transacoes"));
+            
+            // Cria um mapa: chave = ID da conta, valor = Nome do Aluno
+            const mapa = { "ADMIN-VANIA": "Administração", "LOJA-VANIA": "Loja Escola" };
+            usersSnap.forEach((u) => mapa[u.id] = u.data().nome);
+
             let csvContent = "Origem;Destino;Valor;Data\n";
             
-            snap.forEach((doc) => {
+            transacoesSnap.forEach((doc) => {
                 const t = doc.data();
                 const data = t.data && t.data.toDate ? t.data.toDate().toLocaleString() : "N/A";
-                csvContent += `${t.origem};${t.destino};${t.valor};${data}\n`;
+                
+                // Substitui o ID pelo nome usando o mapa
+                const nomeOrigem = mapa[t.origem] || t.origem;
+                const nomeDestino = mapa[t.destino] || t.destino;
+                
+                csvContent += `${nomeOrigem};${nomeDestino};${t.valor};${data}\n`;
             });
 
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.setAttribute("href", url);
-            link.setAttribute("download", "extrato_transacoes.csv");
+            link.setAttribute("download", "extrato_nomes.csv");
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         };
 
+        // ... resto do seu código (importação, listar, excluir, ajustar) permanece o mesmo
         document.getElementById('fileInput').onchange = (e) => {
             const file = e.target.files[0];
             const reader = new FileReader();
